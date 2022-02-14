@@ -14,6 +14,7 @@ import _thread
 wlanConfig = "undefind"
 cpu_value = 0
 ram_value = 0
+timedown = 500
 s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 dac_pin25 = Pin(25, Pin.OUT)
 dac_pin26 = Pin(26, Pin.OUT)
@@ -60,11 +61,12 @@ def dacThread2( threadName, delay):
 def dacThread3( threadName, delay):
     global ram_value
     global cpu_value
+    global timedown
     while(True):
         try:
+            timedown = 500
             data,addr=s.recvfrom(32)
             stringKey = data.decode("utf-8")
-            s.sendto("123",addr)
             array_value =  stringKey.split(",")    
             cpu_value = int(array_value[1])
             ram_value = int(array_value[0])
@@ -72,7 +74,23 @@ def dacThread3( threadName, delay):
         except Exception as e:
             print(e)
             time.sleep(0.1)
-
+def connectDown(threadName):
+    global timedown
+    global ram_value
+    global cpu_value
+    while(True):
+        if timedown < 0:
+            print("udp Pack Time Out Reset")
+            cpu_value = 0
+            ram_value = 0
+            time.sleep(5)
+            cpu_value = 200
+            ram_value = 200
+            time.sleep(5)
+            machine.reset()
+        else:
+            timedown = timedown - 1
+        time.sleep(0.01)
 def tryConnectWifi(wlanSetting):
     wlan = network.WLAN(network.STA_IF)
     wlan.active(False)
@@ -140,9 +158,16 @@ def writeSettingFile(setting):
     files.flush()
     files.close()
     return
-tryConnectWifi(initConfig())
+
+try:
+    tryConnectWifi(initConfig())
+except:
+    machine.reset()
 dac25.write(0)
 dac26.write(0)
 _thread.start_new_thread( dacThread, ("Thread_1", 1, ) )
 _thread.start_new_thread( dacThread2, ("Thread_2", 2, ) )
 _thread.start_new_thread( dacThread3, ("Thread_3", 3, ) )
+_thread.start_new_thread( connectDown, ("Thread_4",) )
+
+
